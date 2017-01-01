@@ -134,6 +134,7 @@ static int intCb (void * const data) {
 }
 
 static bool openStream (player_t * const player) {
+    player->complete = false;
 	assert (player != NULL);
 	/* no leak? */
 	assert (player->fctx == NULL);
@@ -315,14 +316,33 @@ static int play (player_t * const player) {
 	assert (filteredFrame != NULL);
 
 	while (!player->doQuit) {
-		int ret = av_read_frame (player->fctx, &pkt);
+		int ret = av_read_frame (player->fctx, &pkt);//if(pkt_orig.size) {
+//		printf("stream %d, pts %"PRId64", dts %"PRId64"\n",
+//                pkt.stream_index, pkt.pts, pkt.dts);
+// TODO dont write if pkt is invalid. ie when song is finished. then write tail.
+            int writeresult = av_write_frame(player->fcout, &pkt);
+            if (writeresult != 0){
+                printf("what the %i\n",writeresult);
+                if(writeresult == AVERROR_EOF){//if we reached the end of the file we must have everythin
+                    player->complete = true;
+                    printf("reached the end of the file\n");
+                } else {
+                    printf("write error %x\n", ret);
+                }
+            }
+        //}
 		if (ret < 0) {
 			av_free_packet (&pkt);
+			printf("does continue mean to exit the whidl? %x %x\n",ret, AVERROR_EOF);
+			if(ret == AVERROR_EOF){
+                player->complete = true;
+			}
 			return ret;
 		} else if (pkt.stream_index != player->streamIdx) {
 			av_free_packet (&pkt);
 			continue;
 		}
+
 
 		AVPacket pkt_orig = pkt;
 
@@ -375,21 +395,14 @@ static int play (player_t * const player) {
 			pkt.size -= decoded;
 		};
 
-		if(pkt_orig.size) {
-//		printf("stream %d, pts %"PRId64", dts %"PRId64"\n",
-//                pkt.stream_index, pkt.pts, pkt.dts);
-// TODO dont write if pkt is invalid. ie when song is finished. then write tail.
-            ret = av_write_frame(player->fcout, &pkt_orig);
-            if (ret && (ret != AVERROR_EOF)) {
-                printf("write error %x\n", ret);
-            }
-        }
 
 		av_free_packet (&pkt_orig);
 
 		player->songPlayed = av_q2d (player->st->time_base) * (double) pkt.pts;
 		player->lastTimestamp = pkt.pts;
 	}
+
+	printf("Now how do we know if the whole file was recieved? %i\n", player->doQuit);
 
 	av_frame_free (&filteredFrame);
 	av_frame_free (&frame);
@@ -448,6 +461,7 @@ void *BarPlayerThread (void *data) {
 	} while (retry);
 
 	player->mode = PLAYER_FINISHED;
+	printf("why is it finished if we skipped\n");
 
 	return (void *) pret;
 }

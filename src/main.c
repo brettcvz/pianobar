@@ -258,21 +258,21 @@ static void BarMainStartPlayback (BarApp_t *app, pthread_t *playerThread) {
         //TODO check if we have the file locally
         app->player.local = false;
         //make directories now so they're there when needed
-//        if(!app->player.local){
-//            char str[100];
-//            const PianoSong_t * const curSong = app->playlist;
-//            struct stat* st = {0};
-//            if(stat(curSong->artist,st) == -1){
-//                mkdir(curSong->artist,0777);
-//                printf("making directory %s\n",curSong->artist);
-//                //chmod(curSong->artist,0775);
-//            }
-//            sprintf(str, "%s/%s", curSong->artist, curSong->album);
-//            if(stat(str,st) == -1){
-//                mkdir(str,0777);
-//                printf("making directory %s\n",str);
-//            }
-//        }
+        if(!app->player.local && app->player.complete){
+            char str[100];
+            const PianoSong_t * const curSong = app->playlist;
+            struct stat* st = {0};
+            if(stat(curSong->artist,st) == -1){
+                mkdir(curSong->artist,0777);
+                printf("making directory %s\n",curSong->artist);
+                //chmod(curSong->artist,0775);
+            }
+            sprintf(str, "%s/%s", curSong->artist, curSong->album);
+            if(stat(str,st) == -1){
+                mkdir(str,0777);
+                printf("making directory %s\n",str);
+            }
+        }
 
 		app->player.url = curSong->audioUrl;
 		app->player.gain = curSong->fileGain;
@@ -380,9 +380,8 @@ static void BarMainLoop (BarApp_t *app) {
 			if (app->player.interrupted != 0) {
 				app->doQuit = 1;
 			}
-			BarMainPlayerCleanup (app, &playerThread);
-			printf("got whole song\n");
-			if(!app->player.local){
+			if(!app->player.local && app->player.complete){
+                printf("got whole song\n");
                 char str[100];
                 const PianoSong_t * const curSong = app->playlist;
                 struct stat* st = {0};
@@ -404,6 +403,7 @@ static void BarMainLoop (BarApp_t *app) {
                     printf("Couldn't rename file: %i\n", errno);
                 }
 			}
+			BarMainPlayerCleanup (app, &playerThread);
 		}
 
 		/* check whether player finished playing and start playing new

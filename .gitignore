@@ -7,3 +7,6 @@ pianobar
 libpiano.a
 libpiano.so*
 waitress-test
+#ignore media
+*.mp*
+*.aac

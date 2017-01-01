@@ -75,6 +75,7 @@ typedef struct {
 	char *url;
 	const BarSettings_t *settings;
 	bool local;
+	bool complete;
 
 	/* measured in seconds */
 	volatile unsigned int songDuration;
