@@ -255,6 +255,25 @@ static void BarMainStartPlayback (BarApp_t *app, pthread_t *playerThread) {
 		/* setup player */
 		memset (&app->player, 0, sizeof (app->player));
 
+        //TODO check if we have the file locally
+        app->player.local = false;
+        //make directories now so they're there when needed
+//        if(!app->player.local){
+//            char str[100];
+//            const PianoSong_t * const curSong = app->playlist;
+//            struct stat* st = {0};
+//            if(stat(curSong->artist,st) == -1){
+//                mkdir(curSong->artist,0777);
+//                printf("making directory %s\n",curSong->artist);
+//                //chmod(curSong->artist,0775);
+//            }
+//            sprintf(str, "%s/%s", curSong->artist, curSong->album);
+//            if(stat(str,st) == -1){
+//                mkdir(str,0777);
+//                printf("making directory %s\n",str);
+//            }
+//        }
+
 		app->player.url = curSong->audioUrl;
 		app->player.gain = curSong->fileGain;
 		app->player.settings = &app->settings;
@@ -362,6 +381,29 @@ static void BarMainLoop (BarApp_t *app) {
 				app->doQuit = 1;
 			}
 			BarMainPlayerCleanup (app, &playerThread);
+			printf("got whole song\n");
+			if(!app->player.local){
+                char str[100];
+                const PianoSong_t * const curSong = app->playlist;
+                struct stat* st = {0};
+                if(stat(curSong->artist,st) == -1){
+                    mkdir(curSong->artist,0777);
+                    printf("making directory %s\n",curSong->artist);
+                    //chmod(curSong->artist,0775);
+                }
+                sprintf(str, "%s/%s", curSong->artist, curSong->album);
+                if(stat(str,st) == -1){
+                    mkdir(str,0777);
+                    printf("making directory %s\n",str);
+                }
+                sprintf(str, "%s/%s/%s.aac", curSong->artist, curSong->album, curSong->title);
+                //sprintf(str, "%s.aac", curSong->title);
+                printf("trying to rename to : %s\n", str);
+                int ret = rename("temp.aac",str);
+                if(ret != 0){
+                    printf("Couldn't rename file: %i\n", errno);
+                }
+			}
 		}
 
 		/* check whether player finished playing and start playing new

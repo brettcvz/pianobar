@@ -187,6 +187,22 @@ static bool openStream (player_t * const player) {
 	player->songDuration = av_q2d (player->st->time_base) *
 			(double) player->st->duration;
 
+    player->fcout = avformat_alloc_context();
+    player->fcout->oformat = av_guess_format(NULL, "temp.aac", NULL);
+    ret = avio_open2(&player->fcout->pb, "temp.aac", AVIO_FLAG_WRITE, NULL, NULL);
+    for (int i = 0; i < player->fctx->nb_streams; i++) {
+        AVStream *inputStream = player->fctx->streams[i];
+        AVStream *newStream = avformat_new_stream(player->fcout, inputStream->codec->codec);
+        assert(newStream);
+        ret = avcodec_copy_context(newStream->codec, inputStream->codec);
+        assert(!ret);
+        newStream->codec->codec_id = inputStream->codec->codec_id;
+        if (newStream->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
+            newStream->sample_aspect_ratio = (AVRational){1, 1};
+        }
+    }
+    ret = avformat_write_header(player->fcout, NULL);
+
 	return true;
 }
 
@@ -359,6 +375,16 @@ static int play (player_t * const player) {
 			pkt.size -= decoded;
 		};
 
+		if(pkt_orig.size) {
+//		printf("stream %d, pts %"PRId64", dts %"PRId64"\n",
+//                pkt.stream_index, pkt.pts, pkt.dts);
+// TODO dont write if pkt is invalid. ie when song is finished. then write tail.
+            ret = av_write_frame(player->fcout, &pkt_orig);
+            if (ret && (ret != AVERROR_EOF)) {
+                printf("write error %x\n", ret);
+            }
+        }
+
 		av_free_packet (&pkt_orig);
 
 		player->songPlayed = av_q2d (player->st->time_base) * (double) pkt.pts;
@@ -385,6 +411,9 @@ static void finish (player_t * const player) {
 	if (player->fctx != NULL) {
 		avformat_close_input (&player->fctx);
 	}
+	av_write_trailer(player->fcout);
+	//TODO release and close here?
+	//rename("temp.aac","perm.aac");
 }
 
 /*	player thread; for every song a new thread is started

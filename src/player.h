@@ -61,7 +61,7 @@ typedef struct {
 	/* libav */
 	AVFilterContext *fvolume;
 	AVFilterGraph *fgraph;
-	AVFormatContext *fctx;
+	AVFormatContext *fctx, *fcout;
 	AVStream *st;
 	AVFilterContext *fbufsink, *fabuf;
 	int streamIdx;
@@ -74,6 +74,7 @@ typedef struct {
 	double gain;
 	char *url;
 	const BarSettings_t *settings;
+	bool local;
 
 	/* measured in seconds */
 	volatile unsigned int songDuration;
