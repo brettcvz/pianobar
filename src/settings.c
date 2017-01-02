@@ -114,6 +114,7 @@ void BarSettingsDestroy (BarSettings_t *settings) {
 	free (settings->bindTo);
 	free (settings->username);
 	free (settings->password);
+	free (settings->cache_path);
 	free (settings->passwordCmd);
 	free (settings->autostartStation);
 	free (settings->eventCmd);
@@ -280,6 +281,8 @@ void BarSettingsRead (BarSettings_t *settings) {
 				settings->username = strdup (val);
 			} else if (streq ("password", key)) {
 				settings->password = strdup (val);
+			} else if (streq ("cache_path", key)) {
+                settings->cache_path = strdup (val);
 			} else if (streq ("password_command", key)) {
 				settings->passwordCmd = strdup (val);
 			} else if (streq ("rpc_host", key)) {

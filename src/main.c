@@ -480,6 +480,15 @@ int main (int argc, char **argv) {
 	BarSettingsInit (&app.settings);
 	BarSettingsRead (&app.settings);
 
+    if(app.settings.cache_path != NULL){
+        struct stat st;// = {0};
+        if(stat(app.settings.cache_path, &st) == 0 && S_ISDIR(st.st_mode)){
+            chdir(app.settings.cache_path);
+        } else {
+            printf("cache_path doesn't exist please create it manually %s\n",app.settings.cache_path);
+        }
+    }
+
 	PianoReturn_t pret;
 	if ((pret = PianoInit (&app.ph, app.settings.partnerUser,
 			app.settings.partnerPassword, app.settings.device,
