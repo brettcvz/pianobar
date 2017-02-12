@@ -255,6 +255,25 @@ static void BarMainStartPlayback (BarApp_t *app, pthread_t *playerThread) {
 		/* setup player */
 		memset (&app->player, 0, sizeof (app->player));
 
+    // Ripping song to disk
+    //TODO check if we have the file locally
+    //Rip song
+    char filepath[1024];
+    struct stat* st = {0};
+    sprintf(filepath, "cache/%s", curSong->stationId);
+    if(stat(filepath,st) == -1){
+        mkdir(filepath,0777);
+        printf("making directory %s\n",filepath);
+        //chmod(curSong->artist,0775);
+    }
+    sprintf(filepath, "cache/%s/%s - %s.mp3", curSong->stationId, curSong->artist, curSong->title);
+    printf("ripping song to %s\n", filepath);
+    char command[4096];
+    printf("audio URL: %s\n", curSong->audioUrl);
+    sprintf(command, "ffmpeg -loglevel 8 -i \"async:%s\" -acodec mp3 \"%s\"", curSong->audioUrl, filepath);
+    printf("command %s\n", command);
+    system(command);
+
 		app->player.url = curSong->audioUrl;
 		app->player.gain = curSong->fileGain;
 		app->player.settings = &app->settings;
