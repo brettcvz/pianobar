@@ -280,7 +280,7 @@ static void BarMainStartPlayback (BarApp_t *app, pthread_t *playerThread) {
       //-metadata: metadata
       //-q:a 6: lower quality audio (default is 4, lower is better), to speed things up
       //-acodec: convert to mp3
-      sprintf(command, "avconv -loglevel 8 -n -nostdin -i \"async:%s\" -metadata title=\"%s\" -metadata artist=\"%s\" -metadata album=\"%s\" -q:a 7 -acodec mp3 \"%s\" &", curSong->audioUrl, curSong->title, curSong->artist, curSong->album, filepath);
+      sprintf(command, "avconv -loglevel error -n -i \"%s\" -metadata title=\"%s\" -metadata artist=\"%s\" -metadata album=\"%s\" -q:a 7 -acodec mp3 \"%s\" &", curSong->audioUrl, curSong->title, curSong->artist, curSong->album, filepath);
       //printf("command %s\n", command);
       system(command);
     }
