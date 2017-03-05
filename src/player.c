@@ -27,6 +27,7 @@ THE SOFTWARE.
 
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include <math.h>
 #include <stdint.h>
 #include <limits.h>
@@ -134,7 +135,6 @@ static int intCb (void * const data) {
 }
 
 static bool openStream (player_t * const player) {
-    player->complete = false;
 	assert (player != NULL);
 	/* no leak? */
 	assert (player->fctx == NULL);
@@ -187,22 +187,6 @@ static bool openStream (player_t * const player) {
 	player->songPlayed = 0;
 	player->songDuration = av_q2d (player->st->time_base) *
 			(double) player->st->duration;
-
-    player->fcout = avformat_alloc_context();
-    player->fcout->oformat = av_guess_format(NULL, "temp.aac", NULL);
-    ret = avio_open2(&player->fcout->pb, "temp.aac", AVIO_FLAG_WRITE, NULL, NULL);
-    for (int i = 0; i < player->fctx->nb_streams; i++) {
-        AVStream *inputStream = player->fctx->streams[i];
-        AVStream *newStream = avformat_new_stream(player->fcout, inputStream->codec->codec);
-        assert(newStream);
-        ret = avcodec_copy_context(newStream->codec, inputStream->codec);
-        assert(!ret);
-        newStream->codec->codec_id = inputStream->codec->codec_id;
-        if (newStream->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
-            newStream->sample_aspect_ratio = (AVRational){1, 1};
-        }
-    }
-    ret = avformat_write_header(player->fcout, NULL);
 
 	return true;
 }
@@ -316,33 +300,14 @@ static int play (player_t * const player) {
 	assert (filteredFrame != NULL);
 
 	while (!player->doQuit) {
-		int ret = av_read_frame (player->fctx, &pkt);//if(pkt_orig.size) {
-//		printf("stream %d, pts %"PRId64", dts %"PRId64"\n",
-//                pkt.stream_index, pkt.pts, pkt.dts);
-// TODO dont write if pkt is invalid. ie when song is finished. then write tail.
-            int writeresult = av_write_frame(player->fcout, &pkt);
-            if (writeresult != 0){
-                printf("what the %i\n",writeresult);
-                if(writeresult == AVERROR_EOF){//if we reached the end of the file we must have everythin
-                    player->complete = true;
-                    printf("reached the end of the file\n");
-                } else {
-                    printf("write error %x\n", ret);
-                }
-            }
-        //}
+		int ret = av_read_frame (player->fctx, &pkt);
 		if (ret < 0) {
 			av_free_packet (&pkt);
-			printf("does continue mean to exit the whidl? %x %x\n",ret, AVERROR_EOF);
-			if(ret == AVERROR_EOF){
-                player->complete = true;
-			}
 			return ret;
 		} else if (pkt.stream_index != player->streamIdx) {
 			av_free_packet (&pkt);
 			continue;
 		}
-
 
 		AVPacket pkt_orig = pkt;
 
@@ -357,7 +322,11 @@ static int play (player_t * const player) {
 		}
 		pthread_mutex_unlock (&player->pauseMutex);
 
-		while (pkt.size > 0 && !player->doQuit) {
+    //Don't actually play, we just want to rip
+		//while (pkt.size > 0 && !player->doQuit) {
+		long wait_time = (long) (1000000000L * av_q2d (player->st->time_base) * (double) pkt.duration);
+    nanosleep((const struct timespec[]){{0, wait_time}}, NULL);
+		while (false && !player->doQuit) {
 			int got_frame = 0;
 
 			const int decoded = avcodec_decode_audio4 (player->st->codec,
@@ -395,14 +364,11 @@ static int play (player_t * const player) {
 			pkt.size -= decoded;
 		};
 
-
 		av_free_packet (&pkt_orig);
 
 		player->songPlayed = av_q2d (player->st->time_base) * (double) pkt.pts;
 		player->lastTimestamp = pkt.pts;
 	}
-
-	printf("Now how do we know if the whole file was recieved? %i\n", player->doQuit);
 
 	av_frame_free (&filteredFrame);
 	av_frame_free (&frame);
@@ -424,9 +390,6 @@ static void finish (player_t * const player) {
 	if (player->fctx != NULL) {
 		avformat_close_input (&player->fctx);
 	}
-	av_write_trailer(player->fcout);
-	//TODO release and close here?
-	//rename("temp.aac","perm.aac");
 }
 
 /*	player thread; for every song a new thread is started
@@ -461,7 +424,6 @@ void *BarPlayerThread (void *data) {
 	} while (retry);
 
 	player->mode = PLAYER_FINISHED;
-	printf("why is it finished if we skipped\n");
 
 	return (void *) pret;
 }

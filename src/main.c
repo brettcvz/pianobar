@@ -255,24 +255,35 @@ static void BarMainStartPlayback (BarApp_t *app, pthread_t *playerThread) {
 		/* setup player */
 		memset (&app->player, 0, sizeof (app->player));
 
-        //TODO check if we have the file locally
-        app->player.local = false;
-        //make directories now so they're there when needed
-        if(!app->player.local && app->player.complete){
-            char str[100];
-            const PianoSong_t * const curSong = app->playlist;
-            struct stat* st = {0};
-            if(stat(curSong->artist,st) == -1){
-                mkdir(curSong->artist,0777);
-                printf("making directory %s\n",curSong->artist);
-                //chmod(curSong->artist,0775);
-            }
-            sprintf(str, "%s/%s", curSong->artist, curSong->album);
-            if(stat(str,st) == -1){
-                mkdir(str,0777);
-                printf("making directory %s\n",str);
-            }
-        }
+    // Ripping song to disk
+    //Rip song
+    //if artist is Pandora, don't save
+		if (strcmp (curSong->artist, "Pandora") == 0) {
+      printf("Artist is Pandora, not saving: %s\n", curSong->title);
+    } else {
+      char filepath[1024];
+      struct stat st;
+      sprintf(filepath, "cache/%s", curSong->stationId);
+      if(stat(filepath,&st) == -1){
+          printf("making directory %s\n",filepath);
+          mkdir(filepath,0777);
+          //chmod(curSong->artist,0775);
+      }
+      sprintf(filepath, "cache/%s/%s - %s.mp3", curSong->stationId, curSong->artist, curSong->title);
+      printf("ripping song to %s\n", filepath);
+      char command[4096];
+      //printf("audio URL: %s\n", curSong->audioUrl);
+      //-loglevel: quiet down output
+      //-n: no overwrites (just exits)
+      //-nostdin: doesn't listen for input
+      //-i: input file (here, an http url)
+      //-metadata: metadata
+      //-q:a 6: lower quality audio (default is 4, lower is better), to speed things up
+      //-acodec: convert to mp3
+      sprintf(command, "avconv -loglevel 8 -n -nostdin -i \"async:%s\" -metadata title=\"%s\" -metadata artist=\"%s\" -metadata album=\"%s\" -q:a 7 -acodec mp3 \"%s\" &", curSong->audioUrl, curSong->title, curSong->artist, curSong->album, filepath);
+      //printf("command %s\n", command);
+      system(command);
+    }
 
 		app->player.url = curSong->audioUrl;
 		app->player.gain = curSong->fileGain;
@@ -380,29 +391,6 @@ static void BarMainLoop (BarApp_t *app) {
 			if (app->player.interrupted != 0) {
 				app->doQuit = 1;
 			}
-			if(!app->player.local && app->player.complete){
-                printf("got whole song\n");
-                char str[100];
-                const PianoSong_t * const curSong = app->playlist;
-                struct stat* st = {0};
-                if(stat(curSong->artist,st) == -1){
-                    mkdir(curSong->artist,0777);
-                    printf("making directory %s\n",curSong->artist);
-                    //chmod(curSong->artist,0775);
-                }
-                sprintf(str, "%s/%s", curSong->artist, curSong->album);
-                if(stat(str,st) == -1){
-                    mkdir(str,0777);
-                    printf("making directory %s\n",str);
-                }
-                sprintf(str, "%s/%s/%s.aac", curSong->artist, curSong->album, curSong->title);
-                //sprintf(str, "%s.aac", curSong->title);
-                printf("trying to rename to : %s\n", str);
-                int ret = rename("temp.aac",str);
-                if(ret != 0){
-                    printf("Couldn't rename file: %i\n", errno);
-                }
-			}
 			BarMainPlayerCleanup (app, &playerThread);
 		}
 
@@ -479,15 +467,6 @@ int main (int argc, char **argv) {
 
 	BarSettingsInit (&app.settings);
 	BarSettingsRead (&app.settings);
-
-    if(app.settings.cache_path != NULL){
-        struct stat st;// = {0};
-        if(stat(app.settings.cache_path, &st) == 0 && S_ISDIR(st.st_mode)){
-            chdir(app.settings.cache_path);
-        } else {
-            printf("cache_path doesn't exist please create it manually %s\n",app.settings.cache_path);
-        }
-    }
 
 	PianoReturn_t pret;
 	if ((pret = PianoInit (&app.ph, app.settings.partnerUser,
